@@ -1,0 +1,120 @@
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+allprojects {
+    apply plugin: 'java'
+
+    buildDir = new File(rootProject.buildDir, project.name)
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+    }
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
+
+    version = '1.0-rc0'
+
+    jar.duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    jar.from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = [new File(rootProject.projectDir, 'src/main')]
+        }
+    }
+    test {
+        java {
+            srcDirs = [new File(rootProject.projectDir, 'src/test')]
+        }
+    }
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.sf.proguard:proguard-gradle:5.3.3'
+    }
+}
+
+subprojects {
+    task proguard(type: proguard.gradle.ProGuardTask) {
+        dependsOn 'jar'
+
+        injars jar.archivePath
+        outjars new File(rootProject.projectDir, "release/${jar.baseName}-${jar.version}-out.${jar.extension}")
+
+        //dependencies
+        libraryjars "${System.getProperty('java.home')}/lib/rt.jar"
+
+        //warnings
+        dontwarn
+
+        printmapping new File(rootProject.projectDir, "release/${jar.baseName}-${jar.version}-out.map")
+
+        keepattributes 'SourceFile, LineNumberTable'
+
+        optimizations '!method/inlining/*'
+
+        //keeps
+        keep 'class com.** { *; }'
+        keep 'class org.** { *; }'
+        keep 'class java.** { *; }'
+        keep 'class javax.** { *; }'
+        keep 'class repackage.** { *; }'
+        keepclasseswithmembers 'public class * { public static void main(java.lang.String[]); }'
+    }
+
+    uploadArchives {
+        repositories {
+            flatDir {
+                dirs new File(rootProject.projectDir, 'release')
+            }
+        }
+    }
+}
+
+project(":rocalc") {
+    sourceSets {
+        main {
+            java {
+                srcDirs = [new File(rootProject.projectDir, 'src/main/engine'),
+                           new File(rootProject.projectDir, 'src/main/console')]
+            }
+        }
+    }
+
+    jar.manifest {
+        attributes 'Main-Class': 'console.Main',
+                'Implementation-Title': 'ROCalc',
+                'Implementation-Version': version
+    }
+}
+
+project(":rodesign") {
+    sourceSets {
+        main {
+            java {
+                srcDirs = [new File(rootProject.projectDir, 'src/main/engine'),
+                           new File(rootProject.projectDir, 'src/main/application')]
+            }
+        }
+    }
+
+    jar.manifest {
+        attributes 'Main-Class': 'application.Main',
+                'Implementation-Title': 'ROCalc',
+                'Implementation-Version': version
+    }
+}
